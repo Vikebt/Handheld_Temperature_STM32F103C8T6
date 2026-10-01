@@ -56,7 +56,7 @@ typedef struct
 
 /* 函数原型 */
 void     SystemTest_RunAll(SystemTestReport_t *pReport);
-void     SystemTest_RunSingle(SystemTestID_t eTestID);
+void     SystemTest_RunSingle(SystemTestReport_t *pReport, SystemTestID_t eTestID);
 void     SystemTest_PrintReport(const SystemTestReport_t *pReport);
 uint8_t  SystemTest_IsAllPassed(const SystemTestReport_t *pReport);
 void     SystemTest_OLED_ShowResult(const SystemTestReport_t *pReport);

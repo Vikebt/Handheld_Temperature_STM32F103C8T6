@@ -106,6 +106,17 @@ static void vTaskBatteryMonitor(void *pvParameters);
 static void vTaskDataFusion(void *pvParameters);
 static void vTaskWatchdog(void *pvParameters);
 
+static void prvSendLatest(QueueHandle_t xQueue, const void *pvItem, void *pvDiscard)
+{
+    if (xQueueSend(xQueue, pvItem, 0) != pdPASS)
+    {
+        /* Bounded-latency sensor pipeline: discard the oldest sample, never
+         * block a producer, and retain the freshest observation. */
+        (void)xQueueReceive(xQueue, pvDiscard, 0);
+        configASSERT(xQueueSend(xQueue, pvItem, 0) == pdPASS);
+    }
+}
+
 /* ======================== 系统初始化 ======================== */
 
 /**
@@ -170,6 +181,7 @@ static void vTaskTemperature(void *pvParameters)
     (void)pvParameters;
     TickType_t xLastWakeTime = xTaskGetTickCount();
     TempData_t xTempData;
+    TempData_t xDiscard;
     int16_t iObj1, iObj2, iAmb;
     uint8_t ucErrorCount = 0;
     RTCTime_t xRTCNow;
@@ -215,7 +227,7 @@ static void vTaskTemperature(void *pvParameters)
             xTempData.iObject1 = iObj1;
             xTempData.iObject2 = iObj2;
             xTempData.iAmbient = iAmb;
-            xQueueSend(xTempDataQueue, &xTempData, 0);
+            prvSendLatest(xTempDataQueue, &xTempData, &xDiscard);
         }
         else
         {
@@ -265,7 +277,10 @@ static void vTaskRFID(void *pvParameters)
                     printf("%02X ", xCardInfo.aucUID[i]);
                 }
                 printf("\r\n");
-                xQueueSend(xRFIDDataQueue, &xRFIDData, 0);
+                {
+                    RFIDData_t xDiscard;
+                    prvSendLatest(xRFIDDataQueue, &xRFIDData, &xDiscard);
+                }
             }
             ucPrevDetected = 1;
         }
@@ -275,7 +290,10 @@ static void vTaskRFID(void *pvParameters)
             {
                 printf("[RFID] Card removed.\r\n");
                 xRFIDData.ucDetected = 0;
-                xQueueSend(xRFIDDataQueue, &xRFIDData, 0);
+                {
+                    RFIDData_t xDiscard;
+                    prvSendLatest(xRFIDDataQueue, &xRFIDData, &xDiscard);
+                }
             }
             ucPrevDetected = 0;
         }
@@ -286,8 +304,7 @@ static void vTaskRFID(void *pvParameters)
 
 /**
  * @brief  OLED 显示 + 呼吸灯任务
- * @note   周期 200ms, 显示温度/RFID/电池/时间/异常
- *         同时驱动呼吸灯 (每10ms步进, 由内部循环实现)
+ * @note   10ms 周期驱动呼吸灯，每 200ms 刷新一次显示
  */
 static void vTaskDisplay(void *pvParameters)
 {
@@ -298,6 +315,7 @@ static void vTaskDisplay(void *pvParameters)
     char cBuf[32];
     RTCTime_t xTime;
     uint8_t ucTimeValid;
+    uint8_t ucDisplayDivider = 0U;
 
     Watchdog_TaskRegister(WDT_TASK_DISPLAY, "Display", 3000);
 
@@ -310,15 +328,15 @@ static void vTaskDisplay(void *pvParameters)
 
     for (;;)
     {
-        vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(200));
+        vTaskDelayUntil(&xLastWakeTime, pdMS_TO_TICKS(10));
+        LED_Breathing_Tick();
 
-        /* 每200ms调用呼吸灯步进20次 (每10ms一步) */
-        for (uint8_t i = 0; i < 20; i++)
+        if (++ucDisplayDivider < 20U)
         {
-            LED_Breathing_Tick();
-            /* 小延时模拟10ms间隔 */
-            for (volatile uint32_t d = 0; d < 10000; d++) { }
+            Watchdog_Ping(WDT_TASK_DISPLAY);
+            continue;
         }
+        ucDisplayDivider = 0U;
 
         /* 临界区读取共享数据 */
         taskENTER_CRITICAL();
@@ -326,8 +344,11 @@ static void vTaskDisplay(void *pvParameters)
         iT2     = g_pMLX90614_Data->iObjectTemp2;
         iBat    = g_pBatteryInfo->usVoltageMV;
         ucBatPct = g_pBatteryInfo->ucPercentage;
-        ucTimeValid = RTC_GetTime(&xTime);
         taskEXIT_CRITICAL();
+
+        /* RTC access may use peripheral polling and must not run with
+         * interrupts globally masked. */
+        ucTimeValid = RTC_GetTime(&xTime);
 
         /* 第0行: RTC 时间 (如果有效) */
         if (ucTimeValid)
@@ -407,7 +428,10 @@ static void vTaskWiFiUpload(void *pvParameters)
 
             /* 使用 Flash 中存储的 WiFi 配置 */
             ESP8266_Init(WIFI_USART_BAUD);
-            if (ESP8266_STA_TCPClient_Test())
+            if (ESP8266_STA_TCPClient_Connect(g_tSystemConfig.cWiFiSSID,
+                                               g_tSystemConfig.cWiFiPassword,
+                                               g_tSystemConfig.cServerIP,
+                                               g_tSystemConfig.usServerPort))
             {
                 ucWiFiConnected = 1;
                 ucRetryCount = 0;
@@ -549,6 +573,8 @@ static void vTaskWatchdog(void *pvParameters)
 
 int main(void)
 {
+    BaseType_t xTasksOK = pdPASS;
+
     /* 第一步: 初始化硬件 + 自检 + Flash + RTC */
     prvSystemHardwareInit();
 
@@ -557,15 +583,20 @@ int main(void)
     g_xSystemEventGroup = xEventGroupCreate();
     xTempDataQueue  = xQueueCreate(4, sizeof(TempData_t));
     xRFIDDataQueue  = xQueueCreate(2, sizeof(RFIDData_t));
+    configASSERT(g_xI2CMutex != NULL);
+    configASSERT(g_xSystemEventGroup != NULL);
+    configASSERT(xTempDataQueue != NULL);
+    configASSERT(xRFIDDataQueue != NULL);
 
     /* 第三步: 创建 FreeRTOS 任务 (7个) */
-    xTaskCreate(vTaskTemperature,   "Temperature", STACK_SIZE_TEMPERATURE, NULL, PRIO_TEMPERATURE, NULL);
-    xTaskCreate(vTaskRFID,          "RFID",        STACK_SIZE_RFID,        NULL, PRIO_RFID,        NULL);
-    xTaskCreate(vTaskDisplay,       "Display",     STACK_SIZE_DISPLAY,     NULL, PRIO_DISPLAY,     NULL);
-    xTaskCreate(vTaskWiFiUpload,    "WiFi Upload", STACK_SIZE_WIFI,        NULL, PRIO_WIFI,        NULL);
-    xTaskCreate(vTaskBatteryMonitor,"Battery",     STACK_SIZE_BATTERY,     NULL, PRIO_BATTERY,     NULL);
-    xTaskCreate(vTaskDataFusion,    "DataFusion",  STACK_SIZE_FUSION,      NULL, PRIO_FUSION,      NULL);
-    xTaskCreate(vTaskWatchdog,      "Watchdog",    STACK_SIZE_WATCHDOG,    NULL, PRIO_WATCHDOG,    NULL);
+    xTasksOK &= xTaskCreate(vTaskTemperature,   "Temperature", STACK_SIZE_TEMPERATURE, NULL, PRIO_TEMPERATURE, NULL);
+    xTasksOK &= xTaskCreate(vTaskRFID,          "RFID",        STACK_SIZE_RFID,        NULL, PRIO_RFID,        NULL);
+    xTasksOK &= xTaskCreate(vTaskDisplay,       "Display",     STACK_SIZE_DISPLAY,     NULL, PRIO_DISPLAY,     NULL);
+    xTasksOK &= xTaskCreate(vTaskWiFiUpload,    "WiFi Upload", STACK_SIZE_WIFI,        NULL, PRIO_WIFI,        NULL);
+    xTasksOK &= xTaskCreate(vTaskBatteryMonitor,"Battery",     STACK_SIZE_BATTERY,     NULL, PRIO_BATTERY,     NULL);
+    xTasksOK &= xTaskCreate(vTaskDataFusion,    "DataFusion",  STACK_SIZE_FUSION,      NULL, PRIO_FUSION,      NULL);
+    xTasksOK &= xTaskCreate(vTaskWatchdog,      "Watchdog",    STACK_SIZE_WATCHDOG,    NULL, PRIO_WATCHDOG,    NULL);
+    configASSERT(xTasksOK == pdPASS);
 
     /* 第四步: 启动调度器 */
     printf("[SYS] Starting FreeRTOS scheduler (%u tasks)...\r\n", uxTaskGetNumberOfTasks());
@@ -581,6 +612,14 @@ void vApplicationIdleHook(void)
 
 void vApplicationMallocFailedHook(void)
 {
+    taskDISABLE_INTERRUPTS();
+    for (;;) { }
+}
+
+void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName)
+{
+    (void)xTask;
+    (void)pcTaskName;
     taskDISABLE_INTERRUPTS();
     for (;;) { }
 }

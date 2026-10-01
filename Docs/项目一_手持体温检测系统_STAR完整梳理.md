@@ -38,7 +38,7 @@
 | --- | --- |
 | 红外测温 | MLX90614，软件 I2C/SMBus 流程 |
 | RFID | MFRC522，SPI2（PB12–PB15） |
-| WiFi | ESP8266，USART3（PB10 / PB11）；RST：PC13，CH_PD：PB0 |
+| WiFi | ESP8266，USART2（PA2 / PA3）；RST：PC13，CH_PD：PB0 |
 | 调试串口 | USART1（PA9 / PA10） |
 | OLED | 软件串行 GPIO（PA5 / PA7） |
 | 电池监测 | ADC1_IN1（PA1） |

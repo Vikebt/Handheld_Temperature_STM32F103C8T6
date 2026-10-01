@@ -13,6 +13,7 @@
 #define configUSE_IDLE_HOOK                 1
 #define configUSE_TICK_HOOK                 0
 #define configUSE_MALLOC_FAILED_HOOK        1
+#define configCHECK_FOR_STACK_OVERFLOW      2
 #define configUSE_16_BIT_TICKS              0
 #define configIDLE_SHOULD_YIELD             1
 #define configUSE_TASK_NOTIFICATIONS        1

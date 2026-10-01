@@ -3,18 +3,19 @@
 #include "usart.h"
 #include "esp8266_drive.h"
 #include "oled_iic.h"
+#include <stdio.h>
 
 #define ESP8266_RETRY_MAX 20U
 
 volatile u8 TcpClosedFlag = 0U;
 
-static u8 retry_join_ap(void)
+static u8 retry_join_ap(char *ssid, char *password)
 {
 	u8 retry;
 
 	for (retry = 0U; retry < ESP8266_RETRY_MAX; retry++)
 	{
-		if (ESP8266_JoinAP(User_ESP8266_SSID, User_ESP8266_PWD) == true)
+		if (ESP8266_JoinAP(ssid, password) == true)
 		{
 			return 1U;
 		}
@@ -24,13 +25,16 @@ static u8 retry_join_ap(void)
 	return 0U;
 }
 
-static u8 retry_link_server(void)
+static u8 retry_link_server(char *server_ip, uint16_t server_port)
 {
 	u8 retry;
+	char port[6];
+
+	snprintf(port, sizeof(port), "%u", (unsigned int)server_port);
 
 	for (retry = 0U; retry < ESP8266_RETRY_MAX; retry++)
 	{
-		if (ESP8266_Link_Server(enumTCP, User_ESP8266_TCPServer_IP, User_ESP8266_TCPServer_PORT, Single_ID_0) == true)
+		if (ESP8266_Link_Server(enumTCP, server_ip, port, Single_ID_0) == true)
 		{
 			return 1U;
 		}
@@ -57,8 +61,18 @@ static u8 retry_enable_unvarnish_send(void)
 }
 
 
-u8 ESP8266_STA_TCPClient_Test(void)
+u8 ESP8266_STA_TCPClient_Connect(char *ssid,
+                                 char *password,
+                                 char *server_ip,
+                                 uint16_t server_port)
 {
+	if ((ssid == NULL) || (password == NULL) || (server_ip == NULL) ||
+	    (ssid[0] == '\0') || (server_ip[0] == '\0') || (server_port == 0U))
+	{
+		printf("ESP8266 configuration is not provisioned.\r\n");
+		return 0U;
+	}
+
 	printf("\r\nESP8266 setup start...\r\n");
 
 	ESP8266_CH_PD_Pin_SetH;
@@ -71,7 +85,7 @@ u8 ESP8266_STA_TCPClient_Test(void)
 		return 0U;
 	}
 
-	if (retry_join_ap() == 0U)
+	if (retry_join_ap(ssid, password) == 0U)
 	{
 		printf("Join AP failed.\r\n");
 		return 0U;
@@ -83,7 +97,7 @@ u8 ESP8266_STA_TCPClient_Test(void)
 		return 0U;
 	}
 
-	if (retry_link_server() == 0U)
+	if (retry_link_server(server_ip, server_port) == 0U)
 	{
 		printf("Link server failed.\r\n");
 		return 0U;

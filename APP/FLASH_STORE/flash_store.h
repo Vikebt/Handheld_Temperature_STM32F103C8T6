@@ -18,7 +18,8 @@
 #define FLASH_STORE_MAGIC          0xA55A5AA5   /* 魔数标识有效数据 */
 
 /* 存储参数版本 (用于向前兼容) */
-#define FLASH_STORE_VERSION        0x0001
+#define FLASH_STORE_VERSION        0x0002
+#define FLASH_STORE_TAIL           0x5AA55AA5UL
 
 /* ============== 系统配置参数结构体 ============== */
 #pragma pack(1)
@@ -27,7 +28,7 @@ typedef struct
     /* 头部 */
     uint32_t  ulMagic;                        /* 魔数 (标识数据有效) */
     uint32_t  ulVersion;                      /* 版本号 */
-    uint32_t  ulCRC32;                        /* CRC32 校验 (从magic之后到crc之前) */
+    uint32_t  ulCRC32;                        /* CRC32: whole record with this field zeroed */
 
     /* WiFi 配置 */
     char      cWiFiSSID[32];                  /* WiFi 名称 */

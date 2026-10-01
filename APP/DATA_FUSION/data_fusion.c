@@ -9,6 +9,7 @@
  */
 
 #include "data_fusion.h"
+#include "fusion_policy.h"
 #include "FreeRTOS.h"
 #include "event_groups.h"
 #include "task.h"
@@ -81,20 +82,16 @@ uint8_t DataFusion_Feed(int16_t iTemp1, int16_t iTemp2, int16_t iAmbient,
     g_tDataFusion.usBatteryMV = usBatteryMV;
     g_tDataFusion.ulFusionCount++;
 
-    /* 触发上传条件判断:
-     * 1. 温度数据有效 (非零)
-     * 2. 或每隔 30 秒强制上传一次
+    /* A business record is valid only when temperature and patient identity
+     * belong to the same measurement window.  A heartbeat must use a separate
+     * packet type; reusing a stale UID here would create a false medical record.
      */
     TickType_t xCurTicks = xTaskGetTickCount();
     TickType_t xElapsed  = xCurTicks - g_tDataFusion.ulLastUploadTick;
 
-    if ((iTemp1 != 0) && (xElapsed >= pdMS_TO_TICKS(2000)))
+    if (FusionPolicy_IsMeasurementReady(iTemp1, ucCardDetected, pucCardUID) &&
+        (xElapsed >= pdMS_TO_TICKS(2000)))
     {
-        ucTrigger = 1;
-    }
-    else if (xElapsed >= pdMS_TO_TICKS(30000))
-    {
-        /* 30 秒心跳上传 */
         ucTrigger = 1;
     }
 
@@ -145,21 +142,9 @@ uint8_t DataFusion_PreparePacket(DataPacket_t *pPacket)
     pPacket->usTail       = 0x55AA;
 
     /* CRC16 校验 (从 Header 到 BatteryPct) */
-    uint16_t usCRC = 0;
     uint8_t *pucBytes = (uint8_t *)pPacket;
     uint8_t ucLen = sizeof(DataPacket_t) - sizeof(uint16_t) - sizeof(uint16_t); /* 不计CRC和Tail */
-    for (uint8_t i = 0; i < ucLen; i++)
-    {
-        usCRC ^= (uint16_t)pucBytes[i] << 8;
-        for (uint8_t j = 0; j < 8; j++)
-        {
-            if (usCRC & 0x8000)
-                usCRC = (usCRC << 1) ^ 0x8005;
-            else
-                usCRC <<= 1;
-        }
-    }
-    pPacket->usCRC16 = usCRC;
+    pPacket->usCRC16 = FusionPolicy_CRC16(pucBytes, ucLen);
 
     return 1;
 }

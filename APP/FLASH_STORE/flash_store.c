@@ -9,7 +9,6 @@
 #include "flash_store.h"
 #include "FreeRTOS.h"
 #include "task.h"
-#include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -38,23 +37,37 @@ static uint32_t prvCRC32(const uint8_t *pucData, uint32_t ulLen)
     return ~ulCRC;
 }
 
+/** Calculate the record CRC with the stored CRC field normalized to zero. */
+static uint32_t prvConfigCRC(const SystemConfig_t *pConfig)
+{
+    SystemConfig_t tCopy;
+
+    if (pConfig == NULL)
+    {
+        return 0;
+    }
+
+    memcpy(&tCopy, pConfig, sizeof(tCopy));
+    tCopy.ulCRC32 = 0;
+    return prvCRC32((const uint8_t *)&tCopy, sizeof(tCopy));
+}
+
 /**
  * @brief  设置默认出厂配置
  */
 void FlashStore_SetDefaults(void)
 {
+    memset(&g_tSystemConfig, 0, sizeof(g_tSystemConfig));
     g_tSystemConfig.ulMagic       = FLASH_STORE_MAGIC;
     g_tSystemConfig.ulVersion     = FLASH_STORE_VERSION;
 
-    /* WiFi 默认值 */
-    memset(g_tSystemConfig.cWiFiSSID, 0, 32);
-    memset(g_tSystemConfig.cWiFiPassword, 0, 32);
-    strcpy(g_tSystemConfig.cWiFiSSID, "MyWiFi");
-    strcpy(g_tSystemConfig.cWiFiPassword, "password");
+    /* Credentials must be provisioned after deployment. */
+    g_tSystemConfig.cWiFiSSID[0] = '\0';
+    g_tSystemConfig.cWiFiPassword[0] = '\0';
 
-    /* 服务器默认 */
-    strcpy(g_tSystemConfig.cServerIP, "192.168.1.100");
-    g_tSystemConfig.usServerPort = 8080;
+    /* Networking remains disabled until a valid endpoint is configured. */
+    g_tSystemConfig.cServerIP[0] = '\0';
+    g_tSystemConfig.usServerPort = 0;
 
     /* 设备信息 */
     g_tSystemConfig.ucDeviceID = 0x01;
@@ -70,14 +83,10 @@ void FlashStore_SetDefaults(void)
     g_tSystemConfig.ucTempAlarmHigh        = 38;   /* 38°C */
     g_tSystemConfig.ucTempAlarmLow         = 35;   /* 35°C */
 
-    memset(g_tSystemConfig.aucReserved1, 0, 3);
-    memset(g_tSystemConfig.aucReserved2, 0, 96);
-
-    g_tSystemConfig.ulTail = 0x5AA55AA5;
+    g_tSystemConfig.ulTail = FLASH_STORE_TAIL;
 
     /* 计算 CRC */
-    g_tSystemConfig.ulCRC32 = prvCRC32((uint8_t *)&g_tSystemConfig,
-                                        offsetof(SystemConfig_t, ulCRC32));
+    g_tSystemConfig.ulCRC32 = prvConfigCRC(&g_tSystemConfig);
 }
 
 /**
@@ -88,8 +97,10 @@ uint8_t FlashStore_Load(void)
 {
     const SystemConfig_t *pFlash = (const SystemConfig_t *)FLASH_STORE_PAGE_START;
 
-    /* 检查魔数 */
-    if (pFlash->ulMagic != FLASH_STORE_MAGIC)
+    /* Reject unknown layouts before copying their payload into RAM. */
+    if ((pFlash->ulMagic != FLASH_STORE_MAGIC) ||
+        (pFlash->ulVersion != FLASH_STORE_VERSION) ||
+        (pFlash->ulTail != FLASH_STORE_TAIL))
     {
         return 0;
     }
@@ -112,8 +123,7 @@ uint8_t FlashStore_Save(void)
     FLASH_Status eStatus;
 
     /* 更新 CRC */
-    g_tSystemConfig.ulCRC32 = prvCRC32((uint8_t *)&g_tSystemConfig,
-                                        offsetof(SystemConfig_t, ulCRC32));
+    g_tSystemConfig.ulCRC32 = prvConfigCRC(&g_tSystemConfig);
 
     /* 解锁 Flash */
     FLASH_Unlock();
@@ -150,8 +160,7 @@ uint8_t FlashStore_Save(void)
  */
 uint8_t FlashStore_CRC_Verify(void)
 {
-    uint32_t ulExpected = prvCRC32((uint8_t *)&g_tSystemConfig,
-                                    offsetof(SystemConfig_t, ulCRC32));
+    uint32_t ulExpected = prvConfigCRC(&g_tSystemConfig);
     return (g_tSystemConfig.ulCRC32 == ulExpected) ? 1 : 0;
 }
 
@@ -178,7 +187,9 @@ uint8_t FlashStore_Init(void)
 void FlashStore_PrintConfig(void)
 {
     printf("\r\n[FLASH] System Configuration:\r\n");
-    printf("  WiFi:      %s / %s\r\n", g_tSystemConfig.cWiFiSSID, g_tSystemConfig.cWiFiPassword);
+    printf("  WiFi SSID: %s (%s)\r\n",
+           g_tSystemConfig.cWiFiSSID,
+           g_tSystemConfig.cWiFiSSID[0] ? "provisioned" : "not provisioned");
     printf("  Server:    %s:%u\r\n", g_tSystemConfig.cServerIP, g_tSystemConfig.usServerPort);
     printf("  Device ID: %u\r\n", g_tSystemConfig.ucDeviceID);
     printf("  Calib:     Offset=%d, Gain=%d\r\n",

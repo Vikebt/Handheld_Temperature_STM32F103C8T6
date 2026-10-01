@@ -531,6 +531,7 @@
             <File><FileName>spi_driver.c</FileName><FileType>1</FileType><FilePath>..\..\APP\SPI_Driver\spi_driver.c</FilePath></File>
             <File><FileName>battery.c</FileName><FileType>1</FileType><FilePath>..\..\APP\BATTERY\battery.c</FilePath></File>
             <File><FileName>data_fusion.c</FileName><FileType>1</FileType><FilePath>..\..\APP\DATA_FUSION\data_fusion.c</FilePath></File>
+            <File><FileName>fusion_policy.c</FileName><FileType>1</FileType><FilePath>..\..\APP\DATA_FUSION\fusion_policy.c</FilePath></File>
             <File><FileName>task_watchdog.c</FileName><FileType>1</FileType><FilePath>..\..\APP\TASK_WATCHDOG\task_watchdog.c</FilePath></File>
             <File><FileName>system_test.c</FileName><FileType>1</FileType><FilePath>..\..\APP\SYSTEM_TEST\system_test.c</FilePath></File>
             <File><FileName>flash_store.c</FileName><FileType>1</FileType><FilePath>..\..\APP\FLASH_STORE\flash_store.c</FilePath></File>

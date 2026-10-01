@@ -2,8 +2,8 @@
  * @file    system_test.c
  * @brief   系统自检模块实现
  * @note    逐项诊断：MLX90614 / MFRC522 / ESP8266 / ADC / I2C / SPI / Flash / RTC
- *          结果通过串口�?OLED 呈现，支�?LED 指示
- *          自检异常项通过事件标志组上�? */
+ *          结果通过串口�?OLED 呈现，支�?LED 指示
+ *          自检异常项通过事件标志组上�? */
 
 #include "system_test.h"
 #include "data_fusion.h"
@@ -29,7 +29,7 @@ static const char *g_apcTestNames[TEST_ID_COUNT] = {
 };
 
 /**
- * @brief  运行全部自检�? * @param  pReport  输出测试报告
+ * @brief  运行全部自检�? * @param  pReport  输出测试报告
  */
 void SystemTest_RunAll(SystemTestReport_t *pReport)
 {
@@ -48,7 +48,7 @@ void SystemTest_RunAll(SystemTestReport_t *pReport)
     for (uint8_t i = 0; i < TEST_ID_COUNT; i++)
     {
         pReport->atItems[i].pcItemName = g_apcTestNames[i];
-        SystemTest_RunSingle((SystemTestID_t)i);
+        SystemTest_RunSingle(pReport, (SystemTestID_t)i);
     }
 
     /* 统计结果 */
@@ -61,7 +61,7 @@ void SystemTest_RunAll(SystemTestReport_t *pReport)
 
     pReport->ucAllPassed = (pReport->ucFailCount == 0) ? 1 : 0;
 
-    /* 打印汇�?*/
+    /* 打印汇�?*/
     SystemTest_PrintReport(pReport);
 
     /* OLED 显示 */
@@ -70,7 +70,7 @@ void SystemTest_RunAll(SystemTestReport_t *pReport)
     /* LED 指示 */
     SystemTest_LED_Indicate(pReport);
 
-    /* 如果有失败项，通过事件标志组上�?*/
+    /* 如果有失败项，通过事件标志组上�?*/
     if (pReport->ucFailCount > 0)
     {
         if (g_xSystemEventGroup != NULL)
@@ -83,12 +83,12 @@ void SystemTest_RunAll(SystemTestReport_t *pReport)
 /**
  * @brief  执行单项自检
  */
-void SystemTest_RunSingle(SystemTestID_t eTestID)
+void SystemTest_RunSingle(SystemTestReport_t *pReport, SystemTestID_t eTestID)
 {
     TestItemResult_t *pItem;
-    if (eTestID >= TEST_ID_COUNT) return;
+    if ((pReport == NULL) || (eTestID >= TEST_ID_COUNT)) return;
 
-    pItem = &((SystemTestReport_t *)NULL)->atItems[eTestID]; /* 简化访�?*/
+    pItem = &pReport->atItems[eTestID];
 
     printf("[TEST] %s ... ", g_apcTestNames[eTestID]);
     pItem->pcItemName = g_apcTestNames[eTestID];
@@ -131,7 +131,7 @@ void SystemTest_RunSingle(SystemTestID_t eTestID)
             break;
 
         case TEST_ID_ESP8266:
-            /* 发�?AT 指令测试 */
+            /* 发�?AT 指令测试 */
             printf("(skip in self-test)\r\n");
             pItem->eResult = TEST_SKIP;
             pItem->pcDetailStr = "Skipped (WiFi)";
@@ -139,17 +139,12 @@ void SystemTest_RunSingle(SystemTestID_t eTestID)
 
         case TEST_ID_ADC:
         {
-            /* 读取一�?ADC 验证通道工作 */
+            /* Initialization alone does not verify an ADC conversion. */
             Battery_Init();
-            uint16_t usADC = 0;
-            for (uint8_t i = 0; i < 5; i++)
-            {
-                usADC = 0;
-                pItem->eResult = TEST_PASS;
-                pItem->ulDetailCode = usADC;
-                pItem->pcDetailStr = "ADC OK";
-            }
-            printf("PASS\r\n");
+            pItem->eResult = TEST_SKIP;
+            pItem->ulDetailCode = 0;
+            pItem->pcDetailStr = "Needs ADC sample verification";
+            printf("SKIP (no conversion verification)\r\n");
             break;
         }
 
@@ -179,11 +174,11 @@ void SystemTest_RunSingle(SystemTestID_t eTestID)
 
         case TEST_ID_SPI_BUS:
             SPI_Driver_Init();
-            /* �?SPI 初始化成�?(无硬件错�?, 视作通过 */
-            pItem->eResult = TEST_PASS;
+            /* Controller initialization is not an end-to-end device test. */
+            pItem->eResult = TEST_SKIP;
             pItem->ulDetailCode = 0;
-            pItem->pcDetailStr = "SPI2 Init OK";
-            printf("PASS\r\n");
+            pItem->pcDetailStr = "Controller initialized; device test pending";
+            printf("SKIP (no device transaction)\r\n");
             break;
 
         case TEST_ID_FLASH:
@@ -196,7 +191,7 @@ void SystemTest_RunSingle(SystemTestID_t eTestID)
             }
             else
             {
-                /* 首次运行，写入默认配�?*/
+                /* 首次运行，写入默认配�?*/
                 FlashStore_SetDefaults();
                 FlashStore_Save();
                 pItem->eResult = TEST_PASS;
@@ -247,7 +242,7 @@ void SystemTest_PrintReport(const SystemTestReport_t *pReport)
 }
 
 /**
- * @brief  �?OLED 上显示自检结果
+ * @brief  �?OLED 上显示自检结果
  */
 void SystemTest_OLED_ShowResult(const SystemTestReport_t *pReport)
 {
@@ -274,7 +269,7 @@ void SystemTest_OLED_ShowResult(const SystemTestReport_t *pReport)
 
 /**
  * @brief  LED 指示自检结果
- * @note   PC0 �?= 全部通过, PC0 闪烁 = 存在异常
+ * @note   PC0 �?= 全部通过, PC0 闪烁 = 存在异常
  */
 void SystemTest_LED_Indicate(const SystemTestReport_t *pReport)
 {
@@ -289,7 +284,7 @@ void SystemTest_LED_Indicate(const SystemTestReport_t *pReport)
     else
     {
         LED1_OFF();
-        /* 异常时闪�?*/
+        /* 异常时闪�?*/
         for (uint8_t i = 0; i < 5; i++)
         {
             LED2_ON();

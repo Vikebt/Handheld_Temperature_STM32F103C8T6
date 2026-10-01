@@ -20,6 +20,7 @@
 /* 外部 FreeRTOS 移植层函数 */
 extern void xPortPendSVHandler(void);
 extern void xPortSysTickHandler(void);
+extern void vPortSVCHandler(void);
 
 /******************************************************************************/
 /*            Cortex-M3 Processor Exceptions Handlers                         */
@@ -51,7 +52,15 @@ void UsageFault_Handler(void)
     while (1);
 }
 
-void SVC_Handler(void) { }
+/**
+  * @brief  SVC_Handler — FreeRTOS starts the first task through SVC 0.
+  * @note   An empty handler links successfully but never restores the first
+  *         task context on the Cortex-M3 port.
+  */
+void SVC_Handler(void)
+{
+    vPortSVCHandler();
+}
 
 void DebugMon_Handler(void) { }
 
