@@ -6,6 +6,8 @@
 > **项目记录**：2022 年大学生物理创新竞赛作品；STAR 资料记录为浙江省大学生物理创新竞赛一等奖。  
 > **本人职责**：独立完成系统方案、模块选型、原理图/接线规划、驱动开发、RTOS 协同、通信协议与样机调试。
 
+> **面试学习入口**：[五项目讲义（main）](https://github.com/Vikebt/EmbeddedLinux_IMX6ULL_ConditionMonitor/tree/main/docs/interview-handbook) · [固定版本](https://github.com/Vikebt/EmbeddedLinux_IMX6ULL_ConditionMonitor/tree/study-step-7-detailed-handbook/docs/interview-handbook) · [ARM/FreeRTOS 章节](https://github.com/Vikebt/EmbeddedLinux_IMX6ULL_ConditionMonitor/blob/main/docs/interview-handbook/02-arm-freertos.md) · [P1 项目故事](https://github.com/Vikebt/EmbeddedLinux_IMX6ULL_ConditionMonitor/blob/main/docs/interview-handbook/06-project-stories.md#p1手持体温检测仪)
+
 ## 项目背景
 
 为降低接触式测温的交叉感染风险，并解决人工登记效率低、数据难追溯的问题，我设计了该终端：以红外测温为核心，结合 RFID 身份识别、OLED 本地反馈和 WiFi 数据上报。实现重点不只是“读到温度”，而是在资源有限的 F103C8T6 上处理多外设并发、软件 I2C 总线竞争和异常恢复。

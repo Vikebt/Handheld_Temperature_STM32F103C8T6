@@ -1,5 +1,7 @@
 # 面试证据索引：手持体温检测仪
 
+总讲义见 [模块化五项目面试讲义](https://github.com/Vikebt/EmbeddedLinux_IMX6ULL_ConditionMonitor/tree/main/docs/interview-handbook)，本项目重点对应 [ARM/FreeRTOS](https://github.com/Vikebt/EmbeddedLinux_IMX6ULL_ConditionMonitor/blob/main/docs/interview-handbook/02-arm-freertos.md)、[P1 项目故事](https://github.com/Vikebt/EmbeddedLinux_IMX6ULL_ConditionMonitor/blob/main/docs/interview-handbook/06-project-stories.md#p1手持体温检测仪) 与 [P1 实验](https://github.com/Vikebt/EmbeddedLinux_IMX6ULL_ConditionMonitor/blob/main/docs/interview-handbook/09-experiments.md#2-p1融合条件与-crc-损坏恢复)。固定证据标签为本仓库 `study-step-2-testable-fusion`；总讲义固定标签为 `study-step-7-detailed-handbook`。
+
 本页只记录当前仓库中能够由代码或测试证明的内容。没有硬件在环记录的能力，不写成“已在实物验证”。
 
 | 常见问题 | 本项目中的代码证据 | 可说明的工程取舍 |
