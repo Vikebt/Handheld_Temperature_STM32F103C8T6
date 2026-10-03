@@ -30,8 +30,15 @@
 #define configUSE_TASK_HEARTBEAT            1
 
 /* Interrupt nesting behavior configuration. */
-#define configKERNEL_INTERRUPT_PRIORITY     255
-#define configMAX_SYSCALL_INTERRUPT_PRIORITY 5
+#define configPRIO_BITS                       4
+#define configLIBRARY_LOWEST_INTERRUPT_PRIORITY 15
+#define configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY 5
+#define configKERNEL_INTERRUPT_PRIORITY      (configLIBRARY_LOWEST_INTERRUPT_PRIORITY << (8 - configPRIO_BITS))
+#define configMAX_SYSCALL_INTERRUPT_PRIORITY (configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY << (8 - configPRIO_BITS))
+#if (configMAX_SYSCALL_INTERRUPT_PRIORITY == 0) || \
+    ((configMAX_SYSCALL_INTERRUPT_PRIORITY & ((1 << (8 - configPRIO_BITS)) - 1)) != 0)
+    #error Invalid Cortex-M interrupt priority encoding
+#endif
 
 /* Set the following to 1 to include the function in the build. */
 #define INCLUDE_vTaskPrioritySet            1
