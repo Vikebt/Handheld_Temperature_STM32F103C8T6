@@ -249,7 +249,7 @@
               <IROM>
                 <Type>1</Type>
                 <StartAddress>0x8000000</StartAddress>
-                <Size>0x10000</Size>
+                <Size>0xFC00</Size>
               </IROM>
               <XRAM>
                 <Type>0</Type>
@@ -274,7 +274,7 @@
               <OCR_RVCT4>
                 <Type>1</Type>
                 <StartAddress>0x8000000</StartAddress>
-                <Size>0x10000</Size>
+                <Size>0xFC00</Size>
               </OCR_RVCT4>
               <OCR_RVCT5>
                 <Type>1</Type>
@@ -359,7 +359,7 @@
             </VariousControls>
           </Aads>
           <LDads>
-            <umfTarg>0</umfTarg>
+            <umfTarg>1</umfTarg>
             <Ropi>0</Ropi>
             <Rwpi>0</Rwpi>
             <noStLib>0</noStLib>
@@ -512,9 +512,9 @@
               <FilePath>..\..\BSP\system.c</FilePath>
             </File>
             <File>
-              <FileName>systick.c</FileName>
+              <FileName>delay_timer.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\BSP\systick.c</FilePath>
+              <FilePath>..\..\BSP\delay_timer.c</FilePath>
             </File>
             <File>
               <FileName>usart.c</FileName>

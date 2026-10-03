@@ -146,7 +146,10 @@ static void prvSystemHardwareInit(void)
     OLED_Display_On();
 
     /* === Step 3: Flash 参数加载 (WiFi/设备配置) === */
-    FlashStore_Init();
+    if (!FlashStore_Init())
+    {
+        printf("[FLASH] Configuration persistence failed; RAM defaults active.\r\n");
+    }
     FlashStore_PrintConfig();
 
     /* === Step 4: 运行系统自检 === */
