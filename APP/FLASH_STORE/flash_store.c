@@ -7,8 +7,6 @@
  */
 
 #include "flash_store.h"
-#include "FreeRTOS.h"
-#include "task.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -96,6 +94,7 @@ void FlashStore_SetDefaults(void)
 uint8_t FlashStore_Load(void)
 {
     const SystemConfig_t *pFlash = (const SystemConfig_t *)FLASH_STORE_PAGE_START;
+    SystemConfig_t tCandidate;
 
     /* Reject unknown layouts before copying their payload into RAM. */
     if ((pFlash->ulMagic != FLASH_STORE_MAGIC) ||
@@ -105,11 +104,14 @@ uint8_t FlashStore_Load(void)
         return 0;
     }
 
-    /* 复制到 RAM */
-    memcpy(&g_tSystemConfig, pFlash, sizeof(SystemConfig_t));
-
-    /* CRC 校验 */
-    return FlashStore_CRC_Verify();
+    /* Validate before publishing the record to the live RAM configuration. */
+    memcpy(&tCandidate, pFlash, sizeof(tCandidate));
+    if (tCandidate.ulCRC32 != prvConfigCRC(&tCandidate))
+    {
+        return 0;
+    }
+    memcpy(&g_tSystemConfig, &tCandidate, sizeof(tCandidate));
+    return 1;
 }
 
 /**
@@ -176,8 +178,7 @@ uint8_t FlashStore_Init(void)
     else
     {
         FlashStore_SetDefaults();
-        FlashStore_Save();
-        return 1;
+        return FlashStore_Save();
     }
 }
 

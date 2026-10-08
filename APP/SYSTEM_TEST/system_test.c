@@ -219,9 +219,11 @@ void SystemTest_RunSingle(SystemTestReport_t *pReport, SystemTestID_t eTestID)
             break;
 
         default:
-            pItem->eResult = TEST_NOT_IMPLEMENTED;
-            pItem->pcDetailStr = "Not implemented";
-            printf("N/A\r\n");
+            /* The range guard above makes this path defensive only. */
+            pItem->eResult = TEST_FAIL;
+            pItem->ulDetailCode = (uint32_t)eTestID;
+            pItem->pcDetailStr = "Invalid test ID";
+            printf("FAIL (invalid test ID)\r\n");
             break;
     }
 }
