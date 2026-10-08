@@ -31,8 +31,7 @@ typedef enum
 {
     TEST_PASS = 0,               /* 通过 */
     TEST_FAIL,                   /* 失败 */
-    TEST_SKIP,                   /* 跳过 */
-    TEST_NOT_IMPLEMENTED         /* 未实现 */
+    TEST_SKIP                    /* 需要实物或外部环境 */
 } TestResult_t;
 
 /* 自检项结果结构体 */
